@@ -1,0 +1,204 @@
+#!/usr/bin/env python3
+"""
+API网关主程序
+统一API入口，提供身份认证、请求路由和实时数据WebSocket接口
+"""
+
+import asyncio
+import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import logging
+import os
+from dotenv import load_dotenv
+from fastapi import WebSocket, Query
+from fastapi.websockets import WebSocketDisconnect
+
+from app.core.config import settings
+from app.api.routes import api_router
+from app.websocket.websocket_manager import WebSocketManager
+from app.core.redis_client import RedisClient
+from app.tasks.data_scheduler import DataScheduler
+
+# 加载环境变量
+load_dotenv()
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('logs/apigateway.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# 创建FastAPI应用
+app = FastAPI(
+    title="API网关",
+    description="统一API入口，提供身份认证、请求路由和实时数据WebSocket接口",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# 添加CORS中间件
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 包含API路由
+app.include_router(api_router, prefix="/api/v1")
+
+# 全局变量
+websocket_manager = None
+redis_client = None
+data_scheduler = None
+
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时的初始化"""
+    global websocket_manager, redis_client, data_scheduler
+    
+    try:
+        # 创建日志目录
+        os.makedirs("logs", exist_ok=True)
+        
+        # 初始化Redis客户端
+        redis_client = RedisClient()
+        await redis_client.connect()
+        logger.info("Redis连接成功")
+        
+        # 初始化WebSocket管理器
+        websocket_manager = WebSocketManager(redis_client)
+        logger.info("WebSocket管理器初始化成功")
+        
+        # 初始化数据调度器
+        data_scheduler = DataScheduler(redis_client, websocket_manager)
+        await data_scheduler.start()
+        logger.info("数据调度器启动成功")
+        
+        # 将数据调度器引用传递给WebSocket管理器
+        websocket_manager.data_scheduler = data_scheduler
+        
+        logger.info("API网关启动成功")
+        
+    except Exception as e:
+        logger.error(f"启动失败: {e}")
+        raise
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """应用关闭时的清理"""
+    global websocket_manager, redis_client, data_scheduler
+    
+    try:
+        if data_scheduler:
+            await data_scheduler.stop()
+            logger.info("数据调度器已停止")
+        
+        if websocket_manager:
+            await websocket_manager.close_all()
+            logger.info("WebSocket管理器已关闭")
+        
+        if redis_client:
+            await redis_client.close()
+            logger.info("Redis连接已关闭")
+            
+        logger.info("API网关已关闭")
+        
+    except Exception as e:
+        logger.error(f"关闭时出错: {e}")
+
+@app.get("/")
+async def root():
+    """根路径"""
+    return {
+        "message": "API网关服务",
+        "version": "1.0.0",
+        "status": "running"
+    }
+
+@app.get("/health")
+async def health_check():
+    """健康检查"""
+    return {
+        "status": "healthy",
+        "timestamp": asyncio.get_event_loop().time()
+    }
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket, client_id: str = Query(default="default"), data_type: str = Query(default="general")):
+    """WebSocket连接端点"""
+    global websocket_manager
+    
+    if websocket_manager is None:
+        await websocket.close(code=1008, reason="WebSocket管理器未初始化")
+        return
+    
+    try:
+        # 连接客户端
+        await websocket_manager.connect_client(websocket, client_id, data_type)
+        
+        # 处理WebSocket消息
+        while True:
+            try:
+                # 接收消息
+                message = await websocket.receive_text()
+                
+                # 处理消息
+                await websocket_manager.handle_client_message(client_id, message)
+                
+            except WebSocketDisconnect:
+                logger.info(f"WebSocket客户端断开连接: {client_id}")
+                break
+            except Exception as e:
+                logger.error(f"处理WebSocket消息时出错: {e}")
+                break
+                
+    except Exception as e:
+        logger.error(f"WebSocket连接处理失败: {e}")
+    finally:
+        # 断开客户端
+        if websocket_manager:
+            await websocket_manager.disconnect_client(client_id)
+
+@app.get("/websocket/status")
+async def websocket_status():
+    """获取WebSocket状态"""
+    global websocket_manager
+    
+    if websocket_manager is None:
+        return {"error": "WebSocket管理器未初始化"}
+    
+    return websocket_manager.get_status()
+
+@app.get("/websocket/connections")
+async def websocket_connections():
+    """获取WebSocket连接信息"""
+    global websocket_manager
+    
+    if websocket_manager is None:
+        return {"error": "WebSocket管理器未初始化"}
+    
+    status = websocket_manager.get_status()
+    return {
+        "connections": status.get("connections_info", {}),
+        "subscriptions": status.get("subscriptions", {}),
+        "total_connections": status.get("connection_count", 0)
+    }
+
+if __name__ == "__main__":
+    # 启动应用
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=6005,
+        reload=False,
+        log_level="info"
+    )

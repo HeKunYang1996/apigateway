@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket客户端测试工具</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .header {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .connection-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .message-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .message-form {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .message-log {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: white;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .log-entry.sent {
+            border-left-color: #28a745;
+        }
+        .log-entry.received {
+            border-left-color: #17a2b8;
+        }
+        .log-entry.error {
+            border-left-color: #dc3545;
+        }
+        .timestamp {
+            font-size: 12px;
+            color: #666;
+        }
+        .message-content {
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .subscription-panel {
+            background-color: #e7f3ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .data-display {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .data-item {
+            background-color: white;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .data-header {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .data-values {
+            font-family: monospace;
+            background-color: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔌 WebSocket客户端测试工具</h1>
+        <p>测试API网关的WebSocket功能 - 从Redis获取数据并实时推送</p>
+    </div>
+
+    <div class="container">
+        <h2>连接设置</h2>
+        <div class="connection-panel">
+            <div>
+                <div class="form-group">
+                    <label for="wsUrl">WebSocket URL:</label>
+                    <input type="text" id="wsUrl" value="ws://localhost:6005/ws" placeholder="WebSocket连接地址">
+                </div>
+                <div class="form-group">
+                    <label for="clientId">客户端ID:</label>
+                    <input type="text" id="clientId" value="test_client_001" placeholder="客户端标识">
+                </div>
+            </div>
+            <div>
+                <div class="form-group">
+                    <label for="dataType">数据类型:</label>
+                    <select id="dataType">
+                        <option value="general">通用</option>
+                        <option value="telemetry">遥测</option>
+                        <option value="signal">遥信</option>
+                        <option value="control">遥控</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button id="connectBtn" onclick="connect()">连接</button>
+                    <button id="disconnectBtn" onclick="disconnect()" disabled>断开</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="connectionStatus" class="status disconnected">
+            状态: 未连接
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>数据订阅</h2>
+        <div class="subscription-panel">
+            <div class="form-group">
+                <label for="channels">通道ID (逗号分隔):</label>
+                <input type="text" id="channels" value="1001,1002,1003" placeholder="例如: 1001,1002,1003">
+            </div>
+            <div class="form-group">
+                <label for="dataTypes">数据类型:</label>
+                <select id="dataTypes" multiple>
+                    <option value="T" selected>遥测 (T)</option>
+                    <option value="S" selected>遥信 (S)</option>
+                    <option value="C">遥控 (C)</option>
+                    <option value="A">遥调 (A)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="interval">推送间隔 (毫秒):</label>
+                <input type="number" id="interval" value="1000" min="100" max="10000">
+            </div>
+            <button onclick="subscribe()" id="subscribeBtn" disabled>订阅数据</button>
+            <button onclick="unsubscribe()" id="unsubscribeBtn" disabled>取消订阅</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>消息发送</h2>
+        <div class="message-panel">
+            <div class="message-form">
+                <h3>发送消息</h3>
+                <div class="form-group">
+                    <label for="messageType">消息类型:</label>
+                    <select id="messageType">
+                        <option value="ping">心跳 (ping)</option>
+                        <option value="subscribe">订阅 (subscribe)</option>
+                        <option value="unsubscribe">取消订阅 (unsubscribe)</option>
+                        <option value="control">控制命令 (control)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="messageData">消息数据 (JSON):</label>
+                    <textarea id="messageData" rows="6" placeholder="输入JSON格式的消息数据"></textarea>
+                </div>
+                <button onclick="sendMessage()" id="sendBtn" disabled>发送消息</button>
+            </div>
+            
+            <div class="message-log">
+                <h3>消息日志</h3>
+                <div id="messageLog"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>实时数据显示</h2>
+        <div class="data-display">
+            <div id="dataDisplay">
+                <p>等待数据...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let websocket = null;
+        let isConnected = false;
+        let messageCounter = 0;
+
+        // 连接WebSocket
+        function connect() {
+            const url = document.getElementById('wsUrl').value;
+            const clientId = document.getElementById('clientId').value;
+            const dataType = document.getElementById('dataType').value;
+            
+            try {
+                websocket = new WebSocket(url);
+                
+                websocket.onopen = function(event) {
+                    isConnected = true;
+                    updateConnectionStatus(true);
+                    logMessage('系统', '连接已建立', 'received');
+                    
+                    // 发送连接信息
+                    const connectMessage = {
+                        type: 'connect',
+                        id: `connect_${Date.now()}`,
+                        timestamp: new Date().toISOString(),
+                        data: {
+                            client_id: clientId,
+                            data_type: dataType
+                        }
+                    };
+                    websocket.send(JSON.stringify(connectMessage));
+                };
+                
+                websocket.onmessage = function(event) {
+                    try {
+                        const message = JSON.parse(event.data);
+                        logMessage('服务器', JSON.stringify(message, null, 2), 'received');
+                        handleReceivedMessage(message);
+                    } catch (e) {
+                        logMessage('系统', `消息解析失败: ${event.data}`, 'error');
+                    }
+                };
+                
+                websocket.onclose = function(event) {
+                    isConnected = false;
+                    updateConnectionStatus(false);
+                    logMessage('系统', `连接已关闭: ${event.code} - ${event.reason}`, 'error');
+                };
+                
+                websocket.onerror = function(error) {
+                    logMessage('系统', `连接错误: ${error}`, 'error');
+                };
+                
+            } catch (error) {
+                logMessage('系统', `连接失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 断开连接
+        function disconnect() {
+            if (websocket) {
+                websocket.close();
+                websocket = null;
+            }
+        }
+
+        // 更新连接状态
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const subscribeBtn = document.getElementById('subscribeBtn');
+            const sendBtn = document.getElementById('sendBtn');
+            
+            if (connected) {
+                status.className = 'status connected';
+                status.textContent = '状态: 已连接';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                subscribeBtn.disabled = false;
+                sendBtn.disabled = false;
+            } else {
+                status.className = 'status disconnected';
+                status.textContent = '状态: 未连接';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                subscribeBtn.disabled = true;
+                sendBtn.disabled = true;
+            }
+        }
+
+        // 订阅数据
+        function subscribe() {
+            if (!isConnected) return;
+            
+            const channels = document.getElementById('channels').value.split(',').map(c => parseInt(c.trim())).filter(c => !isNaN(c));
+            const dataTypes = Array.from(document.getElementById('dataTypes').selectedOptions).map(opt => opt.value);
+            const interval = parseInt(document.getElementById('interval').value);
+            
+            const message = {
+                type: 'subscribe',
+                id: `sub_${++messageCounter}`,
+                timestamp: new Date().toISOString(),
+                data: {
+                    channels: channels,
+                    data_types: dataTypes,
+                    interval: interval
+                }
+            };
+            
+            websocket.send(JSON.stringify(message));
+            logMessage('客户端', JSON.stringify(message, null, 2), 'sent');
+        }
+
+        // 取消订阅
+        function unsubscribe() {
+            if (!isConnected) return;
+            
+            const channels = document.getElementById('channels').value.split(',').map(c => parseInt(c.trim())).filter(c => !isNaN(c));
+            
+            const message = {
+                type: 'unsubscribe',
+                id: `unsub_${++messageCounter}`,
+                timestamp: new Date().toISOString(),
+                data: {
+                    channels: channels
+                }
+            };
+            
+            websocket.send(JSON.stringify(message));
+            logMessage('客户端', JSON.stringify(message, null, 2), 'sent');
+        }
+
+        // 发送消息
+        function sendMessage() {
+            if (!isConnected) return;
+            
+            const messageType = document.getElementById('messageType').value;
+            const messageData = document.getElementById('messageData').value;
+            
+            let message = {
+                type: messageType,
+                id: `${messageType}_${++messageCounter}`,
+                timestamp: new Date().toISOString()
+            };
+            
+            if (messageData.trim()) {
+                try {
+                    message.data = JSON.parse(messageData);
+                } catch (e) {
+                    logMessage('系统', `JSON格式错误: ${e.message}`, 'error');
+                    return;
+                }
+            }
+            
+            websocket.send(JSON.stringify(message));
+            logMessage('客户端', JSON.stringify(message, null, 2), 'sent');
+        }
+
+        // 记录消息日志
+        function logMessage(sender, content, type) {
+            const log = document.getElementById('messageLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            
+            const timestamp = document.createElement('div');
+            timestamp.className = 'timestamp';
+            timestamp.textContent = `${new Date().toLocaleTimeString()} - ${sender}`;
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.textContent = content;
+            
+            entry.appendChild(timestamp);
+            entry.appendChild(messageContent);
+            log.appendChild(entry);
+            
+            // 自动滚动到底部
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // 处理接收到的消息
+        function handleReceivedMessage(message) {
+            if (message.type === 'data_batch' || message.type === 'data_update') {
+                displayData(message);
+            }
+        }
+
+        // 显示数据
+        function displayData(message) {
+            const display = document.getElementById('dataDisplay');
+            
+            if (message.type === 'data_batch' && message.data && message.data.updates) {
+                let html = '<h3>批量数据更新</h3>';
+                
+                message.data.updates.forEach(update => {
+                    html += `
+                        <div class="data-item">
+                            <div class="data-header">通道 ${update.channel_id} - ${update.data_type}</div>
+                            <div class="data-values">${JSON.stringify(update.values, null, 2)}</div>
+                        </div>
+                    `;
+                });
+                
+                display.innerHTML = html;
+            } else if (message.type === 'data_update' && message.data) {
+                const update = message.data;
+                const html = `
+                    <h3>数据更新</h3>
+                    <div class="data-item">
+                        <div class="data-header">通道 ${update.channel_id} - ${update.data_type}</div>
+                        <div class="data-values">${JSON.stringify(update.values, null, 2)}</div>
+                    </div>
+                `;
+                display.innerHTML = html;
+            }
+        }
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 设置默认消息数据
+            document.getElementById('messageData').value = JSON.stringify({
+                channels: [1001, 1002],
+                data_types: ["T", "S"],
+                interval: 1000
+            }, null, 2);
+            
+            // 设置默认控制命令数据
+            document.getElementById('messageType').addEventListener('change', function() {
+                if (this.value === 'control') {
+                    document.getElementById('messageData').value = JSON.stringify({
+                        channel_id: 1001,
+                        point_id: 100,
+                        command_type: "set_value",
+                        value: 50.0,
+                        operator: "test_user",
+                        reason: "Test command"
+                    }, null, 2);
+                } else if (this.value === 'subscribe') {
+                    document.getElementById('messageData').value = JSON.stringify({
+                        channels: [1001, 1002],
+                        data_types: ["T", "S"],
+                        interval: 1000
+                    }, null, 2);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
