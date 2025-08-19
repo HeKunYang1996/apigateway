@@ -18,8 +18,30 @@ HTTP REST API 用于：
 2.	按需订阅 - 客户端只订阅需要的通道和数据类型
 3.	批量传输 - 相同时刻的多个数据点合并推送
 4.	精简格式 - 移除冗余字段，保留必要信息
-WebSocket 报文格式
-1. 通用报文结构
+WebSocket 连接和报文格式
+
+## WebSocket 连接
+连接URL: `ws://server:port/ws`
+
+### 连接参数
+- `client_id` (可选): 客户端唯一标识符
+  - 如果不提供，系统会自动生成唯一ID (格式: `client_xxxxxxxx`)
+  - 如果提供相同的client_id，新连接会替换旧连接
+- `data_type` (可选): 数据类型过滤，默认为 "general"
+
+### 连接示例
+```javascript
+// 自动生成客户端ID
+const ws1 = new WebSocket('ws://192.168.30.62:6005/ws');
+
+// 指定客户端ID
+const ws2 = new WebSocket('ws://192.168.30.62:6005/ws?client_id=dashboard_001');
+
+// 指定客户端ID和数据类型
+const ws3 = new WebSocket('ws://192.168.30.62:6005/ws?client_id=mobile_app&data_type=realtime');
+```
+
+## 1. 通用报文结构
 所有WebSocket报文采用JSON格式：
 JSON
 {

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     
     # 应用基本设置
     APP_NAME: str = "API网关"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "1.0.1"
     DEBUG: bool = False
     
     # 服务器设置

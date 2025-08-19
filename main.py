@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import os
+import uuid
 from dotenv import load_dotenv
 from fastapi import WebSocket, Query
 from fastapi.websockets import WebSocketDisconnect
@@ -19,6 +20,9 @@ from app.api.routes import api_router
 from app.websocket.websocket_manager import WebSocketManager
 from app.core.redis_client import RedisClient
 from app.tasks.data_scheduler import DataScheduler
+from app.services.database import initialize_database, close_database, get_database
+from app.services.auth_service import get_auth_service
+from app.routers.auth import router as auth_router
 
 # 加载环境变量
 load_dotenv()
@@ -54,11 +58,43 @@ app.add_middleware(
 
 # 包含API路由
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
 
 # 全局变量
 websocket_manager = None
 redis_client = None
 data_scheduler = None
+
+async def init_admin_user_if_needed():
+    """如果需要则初始化管理员用户"""
+    try:
+        db = get_database()
+        
+        # 检查是否已存在管理员用户
+        admin_user = await db.get_user_by_username("admin")
+        if admin_user:
+            logger.info("管理员用户已存在，跳过创建")
+            return
+        
+        logger.info("未找到管理员用户，开始创建...")
+        
+        # 创建管理员用户
+        auth = get_auth_service()
+        password_hash = auth.hash_password("admin123")
+        user_id = await db.create_user(
+            username="admin",
+            email="admin@voltageems.com",
+            password_hash=password_hash,
+            role_id=1  # 管理员角色
+        )
+        
+        logger.info(f"管理员用户创建成功 (ID: {user_id})")
+        logger.info("默认登录信息: admin / admin123")
+        logger.info("⚠️ 请尽快修改默认密码！")
+        
+    except Exception as e:
+        logger.error(f"初始化管理员用户失败: {e}")
+        # 不抛出异常，让应用继续启动
 
 @app.on_event("startup")
 async def startup_event():
@@ -69,10 +105,22 @@ async def startup_event():
         # 创建日志目录
         os.makedirs("logs", exist_ok=True)
         
+        # 初始化数据库
+        await initialize_database()
+        logger.info("数据库初始化成功")
+        
+        # 初始化管理员用户（如果需要）
+        await init_admin_user_if_needed()
+        logger.info("管理员用户检查完成")
+        
         # 初始化Redis客户端
         redis_client = RedisClient()
         await redis_client.connect()
         logger.info("Redis连接成功")
+        
+        # 设置全局Redis客户端给API路由使用
+        from app.api import routes
+        routes.redis_client = redis_client
         
         # 初始化WebSocket管理器
         websocket_manager = WebSocketManager(redis_client)
@@ -109,6 +157,10 @@ async def shutdown_event():
         if redis_client:
             await redis_client.close()
             logger.info("Redis连接已关闭")
+        
+        # 关闭数据库连接
+        await close_database()
+        logger.info("数据库连接已关闭")
             
         logger.info("API网关已关闭")
         
@@ -133,13 +185,18 @@ async def health_check():
     }
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, client_id: str = Query(default="default"), data_type: str = Query(default="general")):
+async def websocket_endpoint(websocket: WebSocket, client_id: str = Query(default=None), data_type: str = Query(default="general")):
     """WebSocket连接端点"""
     global websocket_manager
     
     if websocket_manager is None:
         await websocket.close(code=1008, reason="WebSocket管理器未初始化")
         return
+    
+    # 如果没有提供client_id，自动生成唯一ID
+    if client_id is None:
+        client_id = f"client_{uuid.uuid4().hex[:8]}"
+        logger.info(f"自动生成客户端ID: {client_id}")
     
     try:
         # 连接客户端

@@ -62,6 +62,11 @@ echo "🛑 停止现有容器..."
 docker stop voltageems-apigateway 2>/dev/null || true
 docker rm voltageems-apigateway 2>/dev/null || true
 
+# 创建配置目录
+echo "📁 创建配置目录..."
+mkdir -p /extp/config
+mkdir -p /extp/logs
+
 # 启动服务（使用host网络模式）
 echo "🚀 启动API网关服务..."
 echo "🏷️  使用镜像: $IMAGE_NAME"
@@ -70,6 +75,7 @@ docker run -d \
     --network=host \
     --restart=unless-stopped \
     -v /extp/logs:/app/logs \
+    -v /extp/config:/app/config \
     -e REDIS_HOST=localhost \
     -e REDIS_PORT=6379 \
     -e REDIS_DB=0 \
@@ -79,20 +85,30 @@ docker run -d \
 
 # 等待服务启动
 echo "⏳ 等待服务启动..."
-sleep 5
+sleep 10
 
-# 检查服务状态
+# 检查服务状态（重试机制）
 echo "🔍 检查服务状态..."
-if curl -f http://localhost:6005/health > /dev/null 2>&1; then
-    echo "✅ API网关启动成功！"
-    echo "📱 服务地址: http://localhost:6005"
-    echo "🔌 WebSocket: ws://localhost:6005/ws"
-    echo "📊 健康检查: http://localhost:6005/health"
-else
-    echo "❌ 服务启动失败，请检查日志"
-    docker logs voltageems-apigateway
-    exit 1
-fi
+for i in {1..6}; do
+    if curl -f -s http://localhost:6005/health > /dev/null 2>&1; then
+        echo "✅ API网关启动成功！"
+        echo "📱 服务地址: http://localhost:6005"
+        echo "🔌 WebSocket: ws://localhost:6005/ws"
+        echo "📊 健康检查: http://localhost:6005/health"
+        echo "📖 API文档: http://localhost:6005/docs"
+        break
+    else
+        if [ $i -eq 6 ]; then
+            echo "❌ 服务启动失败，请检查日志"
+            echo "💡 提示：服务可能仍在启动中，请稍后手动验证"
+            docker logs --tail 20 voltageems-apigateway
+            exit 1
+        else
+            echo "⏳ 等待服务响应... ($i/5)"
+            sleep 5
+        fi
+    fi
+done
 
 echo "🎉 启动完成！"
 echo "🔧 管理命令:"

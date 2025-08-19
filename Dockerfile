@@ -25,8 +25,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # 复制应用代码
 COPY . .
 
-# 创建日志目录
-RUN mkdir -p logs
+# 创建必要目录
+RUN mkdir -p logs config
 
 # 暴露端口
 EXPOSE 6005

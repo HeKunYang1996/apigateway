@@ -33,6 +33,16 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket, client_id: str, data_type: str = "general"):
         """建立连接"""
         await websocket.accept()
+        
+        # 如果客户端ID已存在，断开旧连接
+        if client_id in self.active_connections:
+            try:
+                old_websocket = self.active_connections[client_id]
+                await old_websocket.close(code=1000, reason="新连接替换")
+                logger.warning(f"客户端 {client_id} 的旧连接已被新连接替换")
+            except Exception as e:
+                logger.debug(f"关闭旧连接时出错: {e}")
+        
         self.active_connections[client_id] = websocket
         self.connection_info[client_id] = {
             "websocket": websocket,
