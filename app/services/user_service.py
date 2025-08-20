@@ -41,18 +41,12 @@ class UserService:
             if existing_user:
                 raise ValueError("用户名已存在")
             
-            # 检查邮箱是否已存在
-            existing_email = await self._get_database().get_user_by_email(user_data.email)
-            if existing_email:
-                raise ValueError("邮箱已存在")
-            
             # 加密密码
             password_hash = self._get_auth_service().hash_password(user_data.password)
             
             # 创建用户
             user_id = await self._get_database().create_user(
                 username=user_data.username,
-                email=user_data.email,
                 password_hash=password_hash,
                 role_id=user_data.role_id
             )
@@ -67,7 +61,6 @@ class UserService:
             return {
                 "user_id": user_id,
                 "username": user_data.username,
-                "email": user_data.email,
                 "role": user_info["role"],
                 "message": "用户注册成功"
             }
@@ -82,12 +75,8 @@ class UserService:
     async def authenticate_user(self, login_data: UserLogin) -> Token:
         """用户登录认证"""
         try:
-            # 支持用户名或邮箱登录
-            user = None
-            if "@" in login_data.username:
-                user = await self._get_database().get_user_by_email(login_data.username)
-            else:
-                user = await self._get_database().get_user_by_username(login_data.username)
+            # 仅支持用户名登录
+            user = await self._get_database().get_user_by_username(login_data.username)
             
             if not user:
                 raise ValueError("用户不存在")
@@ -183,14 +172,6 @@ class UserService:
             # 构建更新语句
             update_fields = []
             params = []
-            
-            if update_data.email is not None:
-                # 检查邮箱是否被其他用户使用
-                existing_email = await self._get_database().get_user_by_email(update_data.email)
-                if existing_email and existing_email["id"] != user_id:
-                    raise ValueError("邮箱已被其他用户使用")
-                update_fields.append("email = ?")
-                params.append(update_data.email)
             
             if update_data.role_id is not None:
                 # 验证角色ID是否有效

@@ -235,7 +235,6 @@ class DatabaseManager:
         return {
             "id": row["id"],
             "username": row["username"],
-            "email": row["email"],
             "is_active": bool(row["is_active"]),
             "last_login": row["last_login"],
             "created_at": row["created_at"],

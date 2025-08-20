@@ -32,7 +32,6 @@ class User(BaseModel):
     """用户模型"""
     id: int
     username: str = Field(..., min_length=3, max_length=50, description="用户名")
-    email: str = Field(..., description="邮箱")
     password_hash: str = Field(..., description="加密后的密码")
     role_id: int = Field(..., description="角色ID")
     is_active: bool = Field(default=True, description="是否激活")
@@ -48,7 +47,6 @@ class UserWithRole(BaseModel):
     """包含角色信息的用户模型"""
     id: int
     username: str
-    email: str
     is_active: bool
     last_login: Optional[datetime]
     created_at: datetime
@@ -62,20 +60,18 @@ class UserWithRole(BaseModel):
 class UserCreate(BaseModel):
     """用户创建模型"""
     username: str = Field(..., min_length=3, max_length=50)
-    email: str = Field(..., regex=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
     password: str = Field(..., min_length=6, max_length=100)
     role_id: int = Field(default=3, description="默认为查看者角色")
 
 
 class UserLogin(BaseModel):
     """用户登录模型"""
-    username: str = Field(..., description="用户名或邮箱")
+    username: str = Field(..., description="用户名")
     password: str = Field(..., description="密码")
 
 
 class UserUpdate(BaseModel):
     """用户更新模型"""
-    email: Optional[str] = None
     role_id: Optional[int] = None
     is_active: Optional[bool] = None
 

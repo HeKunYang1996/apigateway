@@ -224,30 +224,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str = Query(defaul
         if websocket_manager:
             await websocket_manager.disconnect_client(client_id)
 
-@app.get("/websocket/status")
-async def websocket_status():
-    """获取WebSocket状态"""
-    global websocket_manager
-    
-    if websocket_manager is None:
-        return {"error": "WebSocket管理器未初始化"}
-    
-    return websocket_manager.get_status()
 
-@app.get("/websocket/connections")
-async def websocket_connections():
-    """获取WebSocket连接信息"""
-    global websocket_manager
-    
-    if websocket_manager is None:
-        return {"error": "WebSocket管理器未初始化"}
-    
-    status = websocket_manager.get_status()
-    return {
-        "connections": status.get("connections_info", {}),
-        "subscriptions": status.get("subscriptions", {}),
-        "total_connections": status.get("connection_count", 0)
-    }
 
 if __name__ == "__main__":
     # 启动应用

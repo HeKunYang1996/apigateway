@@ -30,7 +30,6 @@ async def register(user_data: UserCreate):
     用户注册
     
     - **username**: 用户名（3-50字符）
-    - **email**: 邮箱地址
     - **password**: 密码（6-100字符）
     - **role_id**: 角色ID（可选，默认为3-查看者）
     """
@@ -184,11 +183,10 @@ async def update_current_user(
     """
     更新当前用户信息
     
-    - **email**: 新邮箱（可选）
     - **role_id**: 角色ID（可选，需要管理员权限）
     - **is_active**: 激活状态（可选，需要管理员权限）
     
-    普通用户只能修改自己的邮箱
+    普通用户暂无可修改的字段
     """
     try:
         user_service = get_user_service()
