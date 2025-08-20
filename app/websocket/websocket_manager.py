@@ -480,3 +480,39 @@ class WebSocketManager:
             
         except Exception as e:
             logger.error(f"推送告警消息失败: {e}")
+    
+    async def broadcast_custom_message(self, custom_data: Dict[str, Any]):
+        """广播自定义消息到所有连接的WebSocket客户端（原样转发）"""
+        try:
+            # 获取所有连接的客户端
+            connected_clients = list(self.connection_manager.active_connections.keys())
+            
+            if connected_clients:
+                # 向每个连接的客户端发送原始消息（不包装）
+                for client_id in connected_clients:
+                    await self.send_message(client_id, custom_data)
+                
+                logger.info(f"广播消息发送成功，接收客户端数量: {len(connected_clients)}")
+                return {
+                    "success": True,
+                    "message": f"消息已广播到 {len(connected_clients)} 个客户端",
+                    "client_count": len(connected_clients),
+                    "clients": connected_clients
+                }
+            else:
+                logger.info("没有连接的客户端，跳过广播")
+                return {
+                    "success": True,
+                    "message": "没有连接的客户端",
+                    "client_count": 0,
+                    "clients": []
+                }
+                
+        except Exception as e:
+            logger.error(f"广播消息失败: {e}")
+            return {
+                "success": False,
+                "message": f"广播失败: {str(e)}",
+                "client_count": 0,
+                "clients": []
+            }
