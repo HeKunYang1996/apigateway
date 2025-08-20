@@ -294,6 +294,61 @@ class UserService:
         except Exception as e:
             logger.error(f"获取角色列表异常: {e}")
             raise RuntimeError("获取角色列表失败")
+    
+    async def get_all_users_public(self) -> list:
+        """获取所有用户的公开信息（不包含密码等敏感信息）"""
+        try:
+            users = await self._get_database().get_all_users_with_roles()
+            return [
+                {
+                    "id": user["id"],
+                    "username": user["username"],
+                    "role": {
+                        "id": user["role_id"],
+                        "name_en": user["role_name_en"],
+                        "name_zh": user["role_name_zh"]
+                    },
+                    "created_at": user["created_at"] if user["created_at"] else "",
+                    "last_login": user["last_login"] if user["last_login"] else "",
+                    "is_active": bool(user["is_active"]) if user["is_active"] is not None else True
+                }
+                for user in users
+            ]
+        except Exception as e:
+            logger.error(f"获取用户列表异常: {e}")
+            raise RuntimeError("获取用户列表失败")
+    
+    async def delete_user(self, user_id: int) -> Dict[str, Any]:
+        """删除用户"""
+        try:
+            # 检查用户是否存在
+            user = await self._get_database().get_user_by_id(user_id)
+            if not user:
+                raise ValueError("用户不存在")
+            
+            # 不允许删除管理员用户（ID为1的用户通常是默认管理员）
+            if user_id == 1:
+                raise ValueError("不能删除默认管理员用户")
+            
+            # 删除用户
+            success = await self._get_database().delete_user(user_id)
+            if not success:
+                raise RuntimeError("删除用户失败")
+            
+            logger.info(f"用户删除成功: {user['username']} (ID: {user_id})")
+            
+            return {
+                "user_id": user_id,
+                "username": user["username"],
+                "message": "用户删除成功"
+            }
+            
+        except ValueError as e:
+            logger.warning(f"删除用户失败: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"删除用户异常: {e}")
+            raise RuntimeError("删除用户失败")
 
 
 # 全局用户服务实例

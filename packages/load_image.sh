@@ -27,8 +27,6 @@ docker rm $(docker ps -aq --filter "name=voltageems-apigateway") 2>/dev/null || 
 # 删除现有镜像
 echo "🗑️  删除现有镜像..."
 docker rmi $(docker images -q "voltageems-apigateway*") 2>/dev/null || true
-echo "🧹 清理悬空镜像..."
-docker rmi $(docker images -f "dangling=true" -q) 2>/dev/null || true
 
 # 查找镜像文件
 IMAGE_FILE=$(ls voltageems-apigateway-*.tar.gz | head -1)
@@ -60,6 +58,9 @@ else
     echo "❌ 镜像加载失败"
     exit 1
 fi
+
+echo "🧹 清理悬空镜像..."
+docker rmi $(docker images -f "dangling=true" -q) 2>/dev/null || true
 
 echo "🎉 镜像加载完成！"
 echo "🚀 现在可以使用 ./start.sh 启动服务了"

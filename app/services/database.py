@@ -108,7 +108,6 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username VARCHAR(50) NOT NULL UNIQUE,
-                    email VARCHAR(255) NOT NULL UNIQUE,
                     password_hash VARCHAR(255) NOT NULL,
                     role_id INTEGER NOT NULL,
                     is_active BOOLEAN DEFAULT 1,
@@ -121,7 +120,6 @@ class DatabaseManager:
             
             # 创建索引
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id)")
             
             self.connection.commit()
@@ -211,13 +209,6 @@ class DatabaseManager:
         )
         return result[0] if result else None
     
-    async def get_user_by_email(self, email: str) -> Optional[sqlite3.Row]:
-        """根据邮箱获取用户"""
-        result = await self.execute_query(
-            "SELECT * FROM users WHERE email = ?", 
-            (email,)
-        )
-        return result[0] if result else None
     
     async def get_user_by_id(self, user_id: int) -> Optional[sqlite3.Row]:
         """根据ID获取用户"""
@@ -257,12 +248,12 @@ class DatabaseManager:
             }
         }
     
-    async def create_user(self, username: str, email: str, password_hash: str, role_id: int = 3) -> int:
+    async def create_user(self, username: str, password_hash: str, role_id: int = 3) -> int:
         """创建用户"""
         return await self.execute_insert("""
-            INSERT INTO users (username, email, password_hash, role_id)
-            VALUES (?, ?, ?, ?)
-        """, (username, email, password_hash, role_id))
+            INSERT INTO users (username, password_hash, role_id)
+            VALUES (?, ?, ?)
+        """, (username, password_hash, role_id))
     
     async def update_user_login_time(self, user_id: int):
         """更新用户最后登录时间"""
@@ -272,9 +263,32 @@ class DatabaseManager:
             WHERE id = ?
         """, (user_id,))
     
+    async def delete_user(self, user_id: int) -> bool:
+        """删除用户"""
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            affected_rows = cursor.rowcount
+            self.connection.commit()
+            cursor.close()
+            return affected_rows > 0
+        except Exception as e:
+            logger.error(f"删除用户失败: {e}")
+            raise
+    
     async def get_all_roles(self) -> List[sqlite3.Row]:
         """获取所有角色"""
         return await self.execute_query("SELECT * FROM roles ORDER BY id")
+    
+    async def get_all_users_with_roles(self) -> List[sqlite3.Row]:
+        """获取所有用户及其角色信息"""
+        return await self.execute_query("""
+            SELECT u.*, r.name_en as role_name_en, r.name_zh as role_name_zh,
+                   r.description as role_description
+            FROM users u
+            JOIN roles r ON u.role_id = r.id
+            ORDER BY u.id
+        """)
     
     def close(self):
         """关闭数据库连接"""

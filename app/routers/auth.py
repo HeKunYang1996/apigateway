@@ -273,7 +273,8 @@ async def get_roles():
         return {
             "success": True,
             "message": "获取角色列表成功",
-            "data": roles
+            "data": roles,
+            "total": len(roles)
         }
         
     except Exception as e:
@@ -281,6 +282,68 @@ async def get_roles():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="获取角色列表失败"
+        )
+
+
+@router.get("/users", response_model=Dict[str, Any])
+async def get_all_users():
+    """
+    获取所有用户列表
+    
+    公开接口，无需认证
+    返回用户基本信息（不包含密码等敏感信息）
+    包含上次登录时间字段
+    """
+    try:
+        user_service = get_user_service()
+        users = await user_service.get_all_users_public()
+        
+        return {
+            "success": True,
+            "message": "获取用户列表成功",
+            "data": users,
+            "total": len(users)
+        }
+        
+    except Exception as e:
+        logger.error(f"获取用户列表异常: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="获取用户列表失败"
+        )
+
+
+@router.delete("/users/{user_id}", response_model=Dict[str, Any])
+async def delete_user(user_id: int, current_user: dict = Depends(admin_only)):
+    """
+    删除用户
+    
+    需要管理员权限
+    不能删除默认管理员用户
+    """
+    try:
+        user_service = get_user_service()
+        result = await user_service.delete_user(user_id)
+        
+        return {
+            "success": True,
+            "message": result["message"],
+            "data": {
+                "user_id": result["user_id"],
+                "username": result["username"]
+            }
+        }
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"删除用户异常: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="删除用户失败"
         )
 
 

@@ -83,7 +83,6 @@ async def init_admin_user_if_needed():
         password_hash = auth.hash_password("admin123")
         user_id = await db.create_user(
             username="admin",
-            email="admin@voltageems.com",
             password_hash=password_hash,
             role_id=1  # 管理员角色
         )
