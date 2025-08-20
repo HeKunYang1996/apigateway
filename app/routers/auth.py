@@ -30,7 +30,7 @@ async def register(user_data: UserCreate):
     用户注册
     
     - **username**: 用户名（3-50字符）
-    - **password**: 密码（6-100字符）
+    - **password**: MD5加密后的密码（32位十六进制字符串）
     - **role_id**: 角色ID（可选，默认为3-查看者）
     """
     try:
@@ -61,8 +61,8 @@ async def login(login_data: UserLogin):
     """
     用户登录
     
-    - **username**: 用户名或邮箱
-    - **password**: 密码
+    - **username**: 用户名
+    - **password**: MD5加密后的密码（32位十六进制字符串）
     
     返回访问令牌和刷新令牌
     """
@@ -232,8 +232,8 @@ async def change_password(
     """
     修改密码
     
-    - **old_password**: 原密码
-    - **new_password**: 新密码（6-100字符）
+    - **old_password**: 原密码（MD5加密后的32位十六进制字符串）
+    - **new_password**: 新密码（MD5加密后的32位十六进制字符串）
     """
     try:
         user_service = get_user_service()

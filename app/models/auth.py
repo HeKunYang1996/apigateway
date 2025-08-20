@@ -60,14 +60,14 @@ class UserWithRole(BaseModel):
 class UserCreate(BaseModel):
     """用户创建模型"""
     username: str = Field(..., min_length=3, max_length=50)
-    password: str = Field(..., min_length=6, max_length=100)
+    password: str = Field(..., min_length=32, max_length=32, description="MD5加密后的密码（32位十六进制字符串）")
     role_id: int = Field(default=3, description="默认为查看者角色")
 
 
 class UserLogin(BaseModel):
     """用户登录模型"""
     username: str = Field(..., description="用户名")
-    password: str = Field(..., description="密码")
+    password: str = Field(..., min_length=32, max_length=32, description="MD5加密后的密码（32位十六进制字符串）")
 
 
 class UserUpdate(BaseModel):
@@ -78,8 +78,8 @@ class UserUpdate(BaseModel):
 
 class PasswordChange(BaseModel):
     """密码修改模型"""
-    old_password: str = Field(..., description="原密码")
-    new_password: str = Field(..., min_length=6, max_length=100, description="新密码")
+    old_password: str = Field(..., min_length=32, max_length=32, description="原密码（MD5加密后的32位十六进制字符串）")
+    new_password: str = Field(..., min_length=32, max_length=32, description="新密码（MD5加密后的32位十六进制字符串）")
 
 
 class Token(BaseModel):

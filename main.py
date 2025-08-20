@@ -78,9 +78,11 @@ async def init_admin_user_if_needed():
         
         logger.info("未找到管理员用户，开始创建...")
         
-        # 创建管理员用户
+        # 创建管理员用户（使用MD5密码）
         auth = get_auth_service()
-        password_hash = auth.hash_password("admin123")
+        # admin123 的 MD5 值
+        admin_password_md5 = "0192023a7bbd73250516f069df18b500"
+        password_hash = auth.hash_password(admin_password_md5)
         user_id = await db.create_user(
             username="admin",
             password_hash=password_hash,
@@ -88,7 +90,8 @@ async def init_admin_user_if_needed():
         )
         
         logger.info(f"管理员用户创建成功 (ID: {user_id})")
-        logger.info("默认登录信息: admin / admin123")
+        logger.info("默认登录信息: admin / admin123 (前端需要MD5加密后传输)")
+        logger.info("MD5密码: 0192023a7bbd73250516f069df18b500")
         logger.info("⚠️ 请尽快修改默认密码！")
         
     except Exception as e:

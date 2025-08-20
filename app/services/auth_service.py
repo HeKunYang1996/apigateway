@@ -36,13 +36,30 @@ class AuthService:
         if self.secret_key == "your-secret-key-here-change-in-production":
             logger.warning("⚠️ 使用默认JWT密钥，生产环境请修改JWT_SECRET_KEY环境变量")
     
-    def hash_password(self, password: str) -> str:
-        """加密密码"""
-        return pwd_context.hash(password)
+    def hash_password(self, md5_password: str) -> str:
+        """
+        加密MD5密码
+        
+        Args:
+            md5_password: 前端传来的MD5加密密码
+            
+        Returns:
+            bcrypt哈希后的密码（用于数据库存储）
+        """
+        return pwd_context.hash(md5_password)
     
-    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        """验证密码"""
-        return pwd_context.verify(plain_password, hashed_password)
+    def verify_password(self, md5_password: str, hashed_password: str) -> bool:
+        """
+        验证MD5密码
+        
+        Args:
+            md5_password: 前端传来的MD5加密密码
+            hashed_password: 数据库中存储的bcrypt哈希
+            
+        Returns:
+            验证结果
+        """
+        return pwd_context.verify(md5_password, hashed_password)
     
     def create_access_token(self, user_data: Dict[str, Any]) -> str:
         """创建访问令牌"""
