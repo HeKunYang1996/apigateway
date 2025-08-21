@@ -299,8 +299,10 @@ async def get_all_users():
         return {
             "success": True,
             "message": "获取用户列表成功",
-            "data": users,
-            "total": len(users)
+            "data": {
+                "total": len(users),
+                "list": users
+            }
         }
         
     except Exception as e:
