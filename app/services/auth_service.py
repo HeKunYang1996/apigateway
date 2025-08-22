@@ -135,6 +135,7 @@ class AuthService:
             
             # 检查令牌类型
             if payload.get("type") != "access":
+                logger.debug("令牌类型错误：不是访问令牌")
                 return None
             
             # 提取用户信息
@@ -143,6 +144,7 @@ class AuthService:
             role = payload.get("role")
             
             if user_id is None or username is None:
+                logger.debug("令牌载荷不完整：缺少用户ID或用户名")
                 return None
             
             return TokenData(user_id=user_id, username=username, role=role)
@@ -150,8 +152,20 @@ class AuthService:
         except jwt.ExpiredSignatureError:
             logger.debug("访问令牌已过期")
             return None
+        except jwt.InvalidTokenError:
+            logger.debug("访问令牌格式无效")
+            return None
+        except jwt.InvalidSignatureError:
+            logger.debug("访问令牌签名无效")
+            return None
+        except jwt.DecodeError:
+            logger.debug("访问令牌解码失败")
+            return None
         except jwt.JWTError as e:
             logger.debug(f"访问令牌验证失败: {e}")
+            return None
+        except Exception as e:
+            logger.warning(f"访问令牌验证异常: {e}")
             return None
     
     def verify_refresh_token(self, token: str) -> Optional[TokenData]:

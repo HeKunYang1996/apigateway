@@ -50,11 +50,22 @@ class AuthMiddleware:
             )
         
         # 验证访问令牌
-        token_data = self._get_auth_service().verify_access_token(credentials.credentials)
-        if not token_data:
+        try:
+            token_data = self._get_auth_service().verify_access_token(credentials.credentials)
+            if not token_data:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="无效或已过期的认证令牌",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        except HTTPException:
+            # 重新抛出HTTP异常
+            raise
+        except Exception as e:
+            logger.error(f"令牌验证异常: {e}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="无效的认证令牌",
+                detail="令牌验证失败",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
@@ -62,17 +73,20 @@ class AuthMiddleware:
         try:
             user_info = await self._get_user_service().get_user_info(token_data.user_id)
             return user_info
-        except ValueError:
+        except ValueError as e:
+            # 用户不存在或被禁用等业务逻辑错误
+            logger.warning(f"用户验证失败: {e}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="用户不存在",
+                detail="用户不存在或已被禁用",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         except Exception as e:
+            # 数据库连接错误等系统异常
             logger.error(f"获取用户信息失败: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="认证服务异常"
+                detail="认证服务暂时不可用"
             )
     
     async def get_current_active_user(
@@ -96,15 +110,20 @@ class AuthMiddleware:
             return None
         
         # 验证访问令牌
-        token_data = self._get_auth_service().verify_access_token(credentials.credentials)
-        if not token_data:
+        try:
+            token_data = self._get_auth_service().verify_access_token(credentials.credentials)
+            if not token_data:
+                return None
+        except Exception as e:
+            logger.debug(f"可选认证令牌验证失败: {e}")
             return None
         
         # 获取用户信息
         try:
             user_info = await self._get_user_service().get_user_info(token_data.user_id)
             return user_info if user_info.get("is_active", False) else None
-        except Exception:
+        except Exception as e:
+            logger.debug(f"可选认证获取用户信息失败: {e}")
             return None
 
 
