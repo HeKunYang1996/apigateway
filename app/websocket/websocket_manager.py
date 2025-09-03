@@ -15,7 +15,7 @@ from app.core.redis_client import RedisClient
 from app.core.edge_data_client import EdgeDataClient
 from app.models.edge_data import (
     WebSocketMessageType, DataType, create_data_update_message, 
-    create_alarm_message, create_subscribe_ack_message,
+    create_alarm_message, create_subscribe_ack_message, create_unsubscribe_ack_message,
     create_control_ack_message, create_error_message, create_pong_message
 )
 from app.models.response import WebSocketMessage, SafeJSONEncoder
@@ -342,16 +342,35 @@ class WebSocketManager:
             channels = data.get("data", {}).get("channels", [])
             
             # 更新订阅信息
+            unsubscribed_channels = []
             if client_id in self.connection_manager.subscriptions:
                 current_channels = self.connection_manager.subscriptions[client_id]["channels"]
+                # 记录实际取消订阅的通道
+                unsubscribed_channels = [ch for ch in channels if ch in current_channels]
+                # 更新订阅列表
                 self.connection_manager.subscriptions[client_id]["channels"] = [
                     ch for ch in current_channels if ch not in channels
                 ]
             
-            logger.info(f"客户端 {client_id} 取消订阅了通道 {channels}")
+            # 发送取消订阅确认
+            ack_message = create_unsubscribe_ack_message(
+                data.get("id", "unsub"),
+                unsubscribed_channels,
+                []
+            )
+            await self.send_message(client_id, ack_message)
+            
+            logger.info(f"客户端 {client_id} 取消订阅了通道 {unsubscribed_channels}")
             
         except Exception as e:
             logger.error(f"处理取消订阅请求失败: {e}")
+            error_msg = create_error_message(
+                "UNSUBSCRIPTION_ERROR",
+                "取消订阅失败",
+                str(e),
+                data.get("id")
+            )
+            await self.send_message(client_id, error_msg)
     
     async def _handle_control(self, client_id: str, data: Dict[str, Any]):
         """处理控制命令"""

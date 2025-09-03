@@ -25,6 +25,7 @@ class WebSocketMessageType(str, Enum):
     DATA_BATCH = "data_batch"
     ALARM = "alarm"
     SUBSCRIBE_ACK = "subscribe_ack"
+    UNSUBSCRIBE_ACK = "unsubscribe_ack"
     CONTROL_ACK = "control_ack"
     ERROR = "error"
     PONG = "pong"
@@ -90,6 +91,11 @@ class SubscribeAckMessage(BaseWebSocketMessage):
     """订阅确认消息"""
     type: WebSocketMessageType = WebSocketMessageType.SUBSCRIBE_ACK
     data: Dict[str, Any] = Field(..., description="订阅确认内容")
+
+class UnsubscribeAckMessage(BaseWebSocketMessage):
+    """取消订阅确认消息"""
+    type: WebSocketMessageType = WebSocketMessageType.UNSUBSCRIBE_ACK
+    data: Dict[str, Any] = Field(..., description="取消订阅确认内容")
 
 class ControlAckMessage(BaseWebSocketMessage):
     """控制命令确认消息"""
@@ -193,6 +199,18 @@ def create_subscribe_ack_message(request_id: str, subscribed: List[int], failed:
             "subscribed": subscribed,
             "failed": failed,
             "total": len(subscribed)
+        }
+    )
+
+def create_unsubscribe_ack_message(request_id: str, unsubscribed: List[int], failed: List[int]) -> UnsubscribeAckMessage:
+    """创建取消订阅确认消息"""
+    return UnsubscribeAckMessage(
+        id=f"{request_id}_ack",
+        data={
+            "request_id": request_id,
+            "unsubscribed": unsubscribed,
+            "failed": failed,
+            "total": len(unsubscribed)
         }
     )
 

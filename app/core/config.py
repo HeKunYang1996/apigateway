@@ -5,7 +5,7 @@
 
 import os
 from typing import Optional, List
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     """应用配置类"""
@@ -50,9 +50,10 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["*"]
     RATE_LIMIT_PER_MINUTE: int = 100
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": True
+    }
 
 # 创建全局设置实例
 settings = Settings()
