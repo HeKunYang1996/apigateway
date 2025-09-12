@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 from enum import Enum
+import time
 
 class DataType(str, Enum):
     """数据类型枚举"""
@@ -48,7 +49,7 @@ class BaseWebSocketMessage(BaseModel):
     """基础WebSocket消息"""
     type: WebSocketMessageType
     id: str
-    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+    timestamp: int = Field(default_factory=lambda: int(time.time()))
     data: Optional[Dict[str, Any]] = None
 
 # 客户端发送的消息
@@ -246,7 +247,7 @@ def create_pong_message(request_id: str, latency: int) -> PongMessage:
     return PongMessage(
         id=f"{request_id}_pong",
         data={
-            "server_time": datetime.now().isoformat(),
+            "server_time": int(time.time()),
             "latency": latency
         }
     )

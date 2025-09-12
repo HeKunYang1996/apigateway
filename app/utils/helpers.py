@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -35,16 +35,21 @@ def safe_json_loads(data: str) -> Any:
         logger.error(f"JSON反序列化失败: {e}")
         return None
 
-def format_timestamp(timestamp: datetime) -> str:
-    """格式化时间戳"""
-    if timestamp.tzinfo is None:
-        timestamp = timestamp.replace(tzinfo=timezone.utc)
-    return timestamp.isoformat()
+def format_timestamp(timestamp: int) -> str:
+    """格式化时间戳为ISO字符串"""
+    dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+    return dt.isoformat()
 
-def parse_timestamp(timestamp_str: str) -> Optional[datetime]:
-    """解析时间戳字符串"""
+def parse_timestamp(timestamp_input: Union[str, int]) -> Optional[datetime]:
+    """解析时间戳（支持字符串或数字格式）"""
     try:
-        return datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        if isinstance(timestamp_input, int):
+            return datetime.fromtimestamp(timestamp_input, tz=timezone.utc)
+        elif isinstance(timestamp_input, str):
+            return datetime.fromisoformat(timestamp_input.replace('Z', '+00:00'))
+        else:
+            logger.error(f"不支持的时间戳类型: {type(timestamp_input)}")
+            return None
     except Exception as e:
         logger.error(f"解析时间戳失败: {e}")
         return None

@@ -135,8 +135,8 @@ async def get_broadcast_status():
         for client_id, info in ws_status.get("connections_info", {}).items():
             connections_info[client_id] = {
                 "data_type": info.get("data_type"),
-                "connected_at": info.get("connected_at").isoformat() if info.get("connected_at") else None,
-                "last_activity": info.get("last_activity").isoformat() if info.get("last_activity") else None
+                "connected_at": info.get("connected_at"),
+                "last_activity": info.get("last_activity")
             }
         
         return JSONResponse(

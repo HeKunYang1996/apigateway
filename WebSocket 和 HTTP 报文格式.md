@@ -47,7 +47,7 @@ JSON
 {
   "type": "string",      // 报文类型
   "id": "string",        // 唯一标识
-  "timestamp": "string", // ISO 8601时间戳
+  "timestamp": "number", // Unix时间戳（秒）
   "data": {}             // 数据载荷
 }
 2. 客户端发送报文
@@ -56,7 +56,7 @@ JSON
 {
   "type": "subscribe",
   "id": "sub_001",
-  "timestamp": "{时间戳}",
+  "timestamp": 1756256162,
   "data": {
     "channels": [1001, 1002],
     "data_types": ["T", "S"],  // T=遥测, S=遥信, C=遥控, A=遥调
@@ -68,7 +68,7 @@ JSON
 {
   "type": "unsubscribe",
   "id": "unsub_001",
-  "timestamp": "2025-08-12T10:30:00Z",
+  "timestamp": 1756256162,
   "data": {
     "channels": [1001]
   }
@@ -78,7 +78,7 @@ JSON
 {
   "type": "control",
   "id": "ctrl_001",
-  "timestamp": "2025-08-12T10:30:00Z",
+  "timestamp": 1756256162,
   "data": {
     "channel_id": 2001,
     "point_id": 20,
@@ -93,7 +93,7 @@ JSON
 {
   "type": "ping",
   "id": "ping_001",
-  "timestamp": "2025-08-12T10:30:00Z"
+  "timestamp": 1756256162
 }
 3. 服务端推送报文
 实时数据更新
@@ -101,7 +101,7 @@ JSON
 {
   "type": "data_update",
   "id": "update_001",
-  "timestamp": "2025-08-12T10:30:00Z",
+  "timestamp": 1756256162,
   "data": {
     "channel_id": 1001,
     "data_type": "T",
@@ -117,7 +117,7 @@ JSON
 {
   "type": "data_batch",
   "id": "batch_001",
-  "timestamp": "2025-08-12T10:30:00Z",
+  "timestamp": 1756256162,
   "data": {
     "updates": [
       {
@@ -144,7 +144,7 @@ JSON
 {
   "type": "alarm",
   "id": "alarm_001",
-  "timestamp": "2025-08-12T10:30:00Z",
+  "timestamp": 1756256162,
   "data": {
     "alarm_id": "ALM_12345",
     "channel_id": 1001,
@@ -160,7 +160,7 @@ JSON
 {
   "type": "subscribe_ack",
   "id": "sub_001_ack",
-  "timestamp": "2025-08-12T10:30:00Z",
+  "timestamp": 1756256162,
   "data": {
     "request_id": "sub_001",
     "subscribed": [1001, 1002],
@@ -173,7 +173,7 @@ JSON
 {
   "type": "control_ack",
   "id": "ctrl_001_ack",
-  "timestamp": "2025-08-12T10:30:00Z",
+  "timestamp": 1756256162,
   "data": {
     "request_id": "ctrl_001",
     "command_id": "CMD_12345",
@@ -189,7 +189,7 @@ JSON
 {
   "type": "error",
   "id": "err_001",
-  "timestamp": "2025-08-12T10:30:00Z",
+  "timestamp": 1756256162,
   "data": {
     "code": "CHANNEL_NOT_FOUND",
     "message": "Channel not found",
@@ -202,7 +202,7 @@ JSON
 {
   "type": "pong",
   "id": "pong_001",
-  "timestamp": "2025-08-12T10:30:00Z",
+  "timestamp": 1756256162,
   "data": {
     "server_time": "2025-08-12T10:30:00Z",
     "latency": 5
@@ -226,7 +226,7 @@ JSON
     }
   ],
   "message": "Found 3 channels",
-  "timestamp": "2025-08-12T10:30:00Z"
+  "timestamp": 1756256162
 }
 获取通道状态
 HTTP
@@ -241,7 +241,7 @@ JSON
     "last_update": 1736755800,
     "active_points": 5
   },
-  "timestamp": "2025-08-12T10:30:00Z"
+  "timestamp": 1756256162
 }
 2. 实时数据查询
 获取通道实时数据
@@ -267,7 +267,7 @@ JSON
     }
   ],
   "message": "Retrieved 1 data records",
-  "timestamp": "2025-08-12T10:30:00Z"
+  "timestamp": 1756256162
 }
 3. 历史数据查询
 获取历史数据（需要InfluxDB集成）
@@ -285,7 +285,7 @@ JSON
   "success": true,
   "data": [],
   "message": "Historical data endpoint - requires InfluxDB integration",
-  "timestamp": "2025-08-12T10:30:00Z"
+  "timestamp": 1756256162
 }
 4. 健康检查
 基础健康检查
@@ -299,7 +299,7 @@ JSON
     "status": "healthy",
     "service": "apigateway-py"
   },
-  "timestamp": "2025-08-12T10:30:00Z"
+  "timestamp": 1756256162
 }
 详细健康检查
 HTTP
@@ -311,7 +311,7 @@ JSON
   "data": {
     "status": "healthy",
     "service": "apigateway-py",
-    "timestamp": "2025-08-12T10:30:00Z",
+    "timestamp": 1756256162,
     "dependencies": {
       "redis": {
         "status": "healthy",
@@ -319,7 +319,7 @@ JSON
       }
     }
   },
-  "timestamp": "2025-08-12T10:30:00Z"
+  "timestamp": 1756256162
 }
 5. 错误响应格式
 JSON
@@ -330,7 +330,7 @@ JSON
     "message": "Channel not found",
     "details": "Channel 9999 not found"
   },
-  "timestamp": "2025-08-12T10:30:00Z"
+  "timestamp": 1756256162
 }
 错误码：
 •	400 - 请求参数错误
@@ -348,7 +348,7 @@ const ws = new WebSocket('ws://localhost/api/ws');
 ws.send(JSON.stringify({
   "type": "subscribe",
   "id": "sub_001",
-  "timestamp": new Date().toISOString(),
+  "timestamp": Math.floor(Date.now() / 1000),
   "data": {
     "channels": [1001, 1002],
     "data_types": ["T"],
@@ -370,7 +370,7 @@ setInterval(() => {
   ws.send(JSON.stringify({
     "type": "ping",
     "id": "ping_" + Date.now(),
-    "timestamp": new Date().toISOString()
+    "timestamp": Math.floor(Date.now() / 1000)
   }));
 }, 30000);
 HTTP API 调用流程

@@ -108,7 +108,7 @@ cd packages
    {
      "type": "subscribe",
      "id": "sub_001",
-     "timestamp": "2024-01-01T00:00:00Z",
+     "timestamp": 1704067200,
      "data": {
        "channels": [1001, 1002],
        "data_types": ["T", "S"],

@@ -143,7 +143,7 @@ class DataScheduler:
                     batch_message = {
                         "type": "data_batch",
                         "id": f"batch_{channel_id}_{int(time.time())}",
-                        "timestamp": datetime.now().isoformat(),
+                        "timestamp": int(time.time()),
                         "data": {
                             "updates": updates
                         }
@@ -195,7 +195,7 @@ class DataScheduler:
                 batch_message = {
                     "type": "data_batch",
                     "id": f"batch_{channel_id}_{int(time.time())}",
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": int(time.time()),
                     "data": {
                         "updates": updates
                     }
@@ -257,7 +257,7 @@ class DataScheduler:
             summary = {
                 "total_channels": 0,
                 "data_types": list(DataType.__members__.keys()),
-                "last_update": datetime.now().isoformat()
+                "last_update": int(time.time())
             }
             
             # 获取通道数量
@@ -290,7 +290,7 @@ class DataScheduler:
             "running": self.running,
             "data_types": list(DataType.__members__.keys()),
             "fetch_interval": settings.DATA_FETCH_INTERVAL,
-            "last_run": datetime.now().isoformat()
+            "last_run": int(time.time())
         }
     
     def add_data_type(self, data_type: str):
@@ -339,7 +339,7 @@ class MockDataGenerator:
                 "temperature": round(20 + (datetime.now().second / 60) * 10, 2),
                 "humidity": round(50 + (datetime.now().second / 60) * 20, 2),
                 "pressure": round(1013 + (datetime.now().second / 60) * 5, 2),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": int(time.time())
             }
             
             # 生成指标数据
@@ -347,15 +347,15 @@ class MockDataGenerator:
                 "cpu_usage": round(30 + (datetime.now().second / 60) * 40, 2),
                 "memory_usage": round(60 + (datetime.now().second / 60) * 30, 2),
                 "disk_usage": round(45 + (datetime.now().second / 60) * 20, 2),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": int(time.time())
             }
             
             # 生成事件数据
             events_data = {
                 "event_type": "system_check",
                 "severity": "info",
-                "message": f"系统检查完成 - {datetime.now().isoformat()}",
-                "timestamp": datetime.now().isoformat()
+                "message": f"系统检查完成 - {int(time.time())}",
+                "timestamp": int(time.time())
             }
             
             # 存储到Redis

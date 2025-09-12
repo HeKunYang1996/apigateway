@@ -142,7 +142,7 @@ class WebSocketManager:
         welcome_message = {
             "type": "connection_established",
             "id": f"welcome_{client_id}",
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": int(time.time()),
             "data": {
                 "client_id": client_id,
                 "data_type": data_type,
@@ -177,7 +177,7 @@ class WebSocketManager:
             fallback_message = json.dumps({
                 "type": "error",
                 "message": "消息序列化失败",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": int(time.time())
             }, cls=SafeJSONEncoder)
             await self.connection_manager.send_personal_message(fallback_message, client_id)
     
@@ -201,7 +201,7 @@ class WebSocketManager:
             fallback_message = json.dumps({
                 "type": "error",
                 "message": "广播消息序列化失败",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": int(time.time())
             }, cls=SafeJSONEncoder)
             await self.connection_manager.broadcast(fallback_message, data_type)
     
@@ -323,7 +323,7 @@ class WebSocketManager:
                     initial_message = {
                         "type": "data_batch",
                         "id": f"initial_{channel_id}_{int(time.time())}",
-                        "timestamp": datetime.now().isoformat(),
+                        "timestamp": int(time.time()),
                         "data": {
                             "updates": updates
                         }
@@ -431,9 +431,9 @@ class WebSocketManager:
                 heartbeat_message = {
                     "type": "heartbeat",
                     "id": f"heartbeat_{int(time.time())}",
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": int(time.time()),
                     "data": {
-                        "server_time": datetime.now().isoformat()
+                        "server_time": int(time.time())
                     }
                 }
                 await self.broadcast_message(heartbeat_message)

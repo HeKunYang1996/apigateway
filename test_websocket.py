@@ -192,7 +192,7 @@ async def simulate_websocket_data_flow(edge_client: EdgeDataClient):
                     batch_message = {
                         "type": "data_batch",
                         "id": f"batch_{channel_id}_{int(time.time())}",
-                        "timestamp": datetime.now().isoformat(),
+                        "timestamp": int(time.time()),
                         "data": {
                             "updates": updates
                         }
