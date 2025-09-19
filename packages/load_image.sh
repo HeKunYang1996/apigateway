@@ -53,6 +53,11 @@ if docker images | grep -q "voltageems-apigateway"; then
     if [ -n "$LATEST_IMAGE" ]; then
         docker tag "$LATEST_IMAGE" "voltageems-apigateway:latest"
         echo "✅ 已创建latest标签: $LATEST_IMAGE -> voltageems-apigateway:latest"
+		
+        # 删除原版本标签，只保留latest
+        echo "🗑️  删除原版本标签: $LATEST_IMAGE"
+        docker rmi "$LATEST_IMAGE" 2>/dev/null || true
+        echo "✅ 已删除原版本标签，只保留latest镜像"
     fi
 else
     echo "❌ 镜像加载失败"
