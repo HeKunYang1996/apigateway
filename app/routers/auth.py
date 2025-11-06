@@ -83,10 +83,12 @@ async def login(login_data: UserLogin):
         }
         
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e)
-        )
+        # 密码错误等认证失败情况返回200状态码，但success为False
+        return {
+            "success": False,
+            "message": str(e),
+            "data": None
+        }
     except Exception as e:
         logger.error(f"用户登录异常: {e}")
         raise HTTPException(
@@ -407,14 +409,43 @@ async def admin_update_user(
     管理员更新用户信息
     
     需要管理员权限
+    - **role_id**: 角色ID（可选）
+    - **is_active**: 激活状态（可选）
+    - **old_password**: 原密码（可选，需与new_password同时提供）
+    - **new_password**: 新密码（可选，需与old_password同时提供）
     """
     try:
         user_service = get_user_service()
-        updated_user = await user_service.update_user(user_id, update_data)
+        messages = []
+        
+        # 如果提供了密码修改字段，先处理密码修改
+        if update_data.old_password and update_data.new_password:
+            from app.models.auth import PasswordChange
+            password_data = PasswordChange(
+                old_password=update_data.old_password,
+                new_password=update_data.new_password
+            )
+            result = await user_service.change_password(user_id, password_data)
+            messages.append(result["message"])
+        elif update_data.old_password or update_data.new_password:
+            # 只提供了其中一个密码字段，报错
+            raise ValueError("修改密码需要同时提供old_password和new_password")
+        
+        # 处理其他字段的更新
+        if update_data.role_id is not None or update_data.is_active is not None:
+            updated_user = await user_service.update_user(user_id, update_data)
+            messages.append("用户信息更新成功")
+        else:
+            # 如果没有其他字段需要更新，只是修改了密码
+            if messages:
+                # 获取用户信息返回
+                updated_user = await user_service.get_user_info(user_id)
+            else:
+                raise ValueError("没有需要更新的字段")
         
         return {
             "success": True,
-            "message": "用户信息更新成功",
+            "message": "；".join(messages) if messages else "更新成功",
             "data": updated_user
         }
         

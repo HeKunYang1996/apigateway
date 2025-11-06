@@ -74,6 +74,8 @@ class UserUpdate(BaseModel):
     """用户更新模型"""
     role_id: Optional[int] = None
     is_active: Optional[bool] = None
+    old_password: Optional[str] = Field(None, min_length=32, max_length=32, description="原密码（MD5加密后的32位十六进制字符串）")
+    new_password: Optional[str] = Field(None, min_length=32, max_length=32, description="新密码（MD5加密后的32位十六进制字符串）")
 
 
 class PasswordChange(BaseModel):
