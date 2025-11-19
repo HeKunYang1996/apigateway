@@ -58,6 +58,7 @@ JSON
   "id": "sub_001",
   "timestamp": 1756256162,
   "data": {
+    "source": "comsrv",
     "channels": [1001, 1002],
     "data_types": ["T", "S"],  // T=遥测, S=遥信, C=遥控, A=遥调
     "interval": 1000           // 推送间隔(ms)
@@ -70,6 +71,7 @@ JSON
   "id": "unsub_001",
   "timestamp": 1756256162,
   "data": {
+    "source": "comsrv",
     "channels": [1001]
   }
 }
@@ -80,6 +82,7 @@ JSON
   "id": "ctrl_001",
   "timestamp": 1756256162,
   "data": {
+    "source": "comsrv",
     "channel_id": 2001,
     "point_id": 20,
     "command_type": "set_value",
@@ -103,6 +106,7 @@ JSON
   "id": "update_001",
   "timestamp": 1756256162,
   "data": {
+    "source": "comsrv",
     "channel_id": 1001,
     "data_type": "T",
     "values": {
@@ -121,6 +125,7 @@ JSON
   "data": {
     "updates": [
       {
+        "source": "comsrv",
         "channel_id": 1001,
         "data_type": "T",
         "values": {
@@ -129,6 +134,7 @@ JSON
         }
       },
       {
+        "source": "comsrv",
         "channel_id": 1002,
         "data_type": "S",
         "values": {
@@ -162,6 +168,7 @@ JSON
   "id": "sub_001_ack",
   "timestamp": 1756256162,
   "data": {
+    "source": "comsrv",
     "request_id": "sub_001",
     "subscribed": [1001, 1002],
     "failed": [],

@@ -5,12 +5,12 @@ Edge数据客户端
 
 import json
 import logging
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Union
 from datetime import datetime
 import redis.asyncio as redis
 
 from app.models.edge_data import (
-    DataType, ComsrvData, ModsrvModel, ModsrvMeasurement, 
+    ComsrvData, ModsrvModel, ModsrvMeasurement, 
     ModsrvAction, AlarmRecord, RuleDefinition
 )
 
@@ -36,20 +36,20 @@ class EdgeDataClient:
     def __init__(self, redis_client: redis.Redis):
         self.redis_client = redis_client
         
-    async def get_comsrv_data(self, channel_id: int, data_type: DataType) -> Dict[str, Any]:
-        """获取通信服务数据
+    async def get_data(self, channel_id: int, data_type: str, source: str = "inst") -> Dict[str, Any]:
+        """获取数据源数据
         
         Args:
             channel_id: 通道ID
-            data_type: 数据类型 (T/S/C/A)
+            data_type: 数据类型字符串 (如 T/S/C/A/M 等，无限制)
+            source: 数据源名称，默认"inst"
             
         Returns:
             通道数据字典
         """
         try:
-            # 确保data_type是字符串值而不是枚举对象
-            data_type_str = data_type.value if hasattr(data_type, 'value') else str(data_type)
-            key = f"comsrv:{channel_id}:{data_type_str}"
+            # data_type 直接使用字符串，无需转换
+            key = f"{source}:{channel_id}:{data_type}"
             
             # 首先检查键的类型
             key_type = await self.redis_client.type(key)
@@ -120,8 +120,20 @@ class EdgeDataClient:
             return result
             
         except Exception as e:
-            logger.error(f"获取通信服务数据失败 {key}: {e}")
+            logger.error(f"获取数据源[{source}]数据失败 {key}: {e}")
             return {}
+    
+    async def get_comsrv_data(self, channel_id: int, data_type: str) -> Dict[str, Any]:
+        """获取通信服务数据（向后兼容方法）
+        
+        Args:
+            channel_id: 通道ID
+            data_type: 数据类型 (T/S/C/A)
+            
+        Returns:
+            通道数据字典
+        """
+        return await self.get_data(channel_id, data_type, source="comsrv")
     
     async def get_modsrv_model(self, model_id: str) -> Optional[ModsrvModel]:
         """获取模型定义
@@ -307,19 +319,25 @@ class EdgeDataClient:
             logger.error(f"获取规则定义失败: {e}")
             return None
     
-    async def get_all_channels(self) -> List[int]:
+    async def get_all_channels(self, source: str = "inst", data_type: str = "M") -> List[int]:
         """获取所有通道ID
+        
+        Args:
+            source: 数据源名称，默认"inst"
+            data_type: 数据类型，用于模式匹配，默认"M"
         
         Returns:
             通道ID列表
         """
         try:
-            pattern = "comsrv:*:T"  # 以遥测数据为基准获取通道
+            pattern = f"{source}:*:{data_type}"  # 以指定数据类型为基准获取通道
             keys = await self.redis_client.keys(pattern)
             
             channels = []
             for key in keys:
-                parts = key.split(":")
+                # 解析key: source:channel_id:data_type
+                parts = key.decode('utf-8') if isinstance(key, bytes) else key
+                parts = parts.split(":")
                 if len(parts) >= 2:
                     try:
                         channel_id = int(parts[1])
@@ -331,38 +349,40 @@ class EdgeDataClient:
             return sorted(channels)
             
         except Exception as e:
-            logger.error(f"获取所有通道失败: {e}")
+            logger.error(f"获取数据源[{source}]所有通道失败: {e}")
             return []
     
-    async def get_channel_data_summary(self, channel_id: int) -> Dict[str, Any]:
+    async def get_channel_data_summary(self, channel_id: int, source: str = "inst", data_types: List[str] = None) -> Dict[str, Any]:
         """获取通道数据摘要
         
         Args:
             channel_id: 通道ID
+            source: 数据源名称，默认"inst"
+            data_types: 数据类型列表，默认为 ["T", "S", "C", "A"]
             
         Returns:
             通道数据摘要
         """
         try:
+            if data_types is None:
+                data_types = ["T", "S", "C", "A"]  # 默认常用类型
+            
             summary = {
                 "channel_id": channel_id,
-                "telemetry": {},
-                "signal": {},
-                "control": {},
-                "adjustment": {}
+                "source": source,
             }
             
             # 获取各种类型的数据
-            for data_type in DataType:
-                data = await self.get_comsrv_data(channel_id, data_type)
+            for data_type in data_types:
+                data = await self.get_data(channel_id, data_type, source)
                 if data:
-                    summary[data_type.value.lower()] = data
+                    summary[data_type] = data
             
             return summary
             
         except Exception as e:
-            logger.error(f"获取通道数据摘要失败: {e}")
-            return {"channel_id": channel_id}
+            logger.error(f"获取数据源[{source}]通道数据摘要失败: {e}")
+            return {"channel_id": channel_id, "source": source}
     
     async def get_model_by_channel_point(self, channel_id: int, point_id: int, is_action: bool = False) -> Optional[str]:
         """根据通道和点位获取模型ID
@@ -406,18 +426,19 @@ class EdgeDataClient:
             logger.error(f"获取模板模型失败: {e}")
             return []
     
-    async def get_command_queue(self, channel_id: int, data_type: DataType) -> List[Dict[str, Any]]:
+    async def get_command_queue(self, channel_id: int, data_type: str, source: str = "inst") -> List[Dict[str, Any]]:
         """获取命令队列
         
         Args:
             channel_id: 通道ID
             data_type: 数据类型
+            source: 数据源名称，默认"inst"
             
         Returns:
             命令列表
         """
         try:
-            key = f"comsrv:trigger:{channel_id}:{data_type}"
+            key = f"{source}:trigger:{channel_id}:{data_type}"
             commands = []
             
             # 获取队列中的所有命令
@@ -436,26 +457,27 @@ class EdgeDataClient:
             return commands
             
         except Exception as e:
-            logger.error(f"获取命令队列失败: {e}")
+            logger.error(f"获取数据源[{source}]命令队列失败: {e}")
             return []
     
-    async def publish_command(self, channel_id: int, data_type: DataType, command_data: Dict[str, Any]) -> bool:
+    async def publish_command(self, channel_id: int, data_type: str, command_data: Dict[str, Any], source: str = "inst") -> bool:
         """发布命令到队列
         
         Args:
             channel_id: 通道ID
             data_type: 数据类型
             command_data: 命令数据
+            source: 数据源名称，默认"inst"
             
         Returns:
             是否成功
         """
         try:
-            key = f"comsrv:trigger:{channel_id}:{data_type}"
+            key = f"{source}:trigger:{channel_id}:{data_type}"
             command_json = json.dumps(command_data)
             await self.redis_client.rpush(key, command_json)
             return True
             
         except Exception as e:
-            logger.error(f"发布命令失败: {e}")
+            logger.error(f"发布命令到数据源[{source}]失败: {e}")
             return False

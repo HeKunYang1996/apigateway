@@ -9,12 +9,8 @@ from datetime import datetime
 from enum import Enum
 import time
 
-class DataType(str, Enum):
-    """数据类型枚举"""
-    T = "T"  # Telemetry (遥测)
-    S = "S"  # Signal (遥信)
-    C = "C"  # Control (遥控)
-    A = "A"  # Adjustment (遥调)
+# DataType 不再定义为枚举，支持任意字符串类型（如 T/S/C/A/M 等）
+# 数据类型会随着项目发展动态增加
 
 class WebSocketMessageType(str, Enum):
     """WebSocket消息类型"""
@@ -117,7 +113,7 @@ class PongMessage(BaseWebSocketMessage):
 class ComsrvData(BaseModel):
     """通信服务数据结构"""
     channel_id: int
-    data_type: DataType
+    data_type: str  # 数据类型字符串 (如 T/S/C/A/M 等，无限制)
     point_id: int
     value: Union[str, float, int]
     timestamp: Optional[int] = None
@@ -165,7 +161,7 @@ class RuleDefinition(BaseModel):
     cooldown: int
 
 # 数据转换函数
-def create_data_update_message(channel_id: int, data_type: DataType, values: Dict[str, Union[str, float, int]]) -> DataUpdateMessage:
+def create_data_update_message(channel_id: int, data_type: str, values: Dict[str, Union[str, float, int]]) -> DataUpdateMessage:
     """创建数据更新消息"""
     return DataUpdateMessage(
         id=f"update_{channel_id}_{data_type}_{int(datetime.now().timestamp())}",

@@ -15,7 +15,6 @@ from app.core.redis_client import RedisClient
 from app.websocket.websocket_manager import WebSocketManager
 from app.core.config import settings
 from app.models.response import WebSocketMessage
-from app.models.edge_data import DataType
 from app.core.edge_data_client import EdgeDataClient
 
 logger = logging.getLogger(__name__)
@@ -112,6 +111,7 @@ class DataScheduler:
     async def _push_data_to_client(self, client_id: str, subscription: dict):
         """向特定客户端推送数据"""
         try:
+            source = subscription.get("source", "inst")  # 获取数据源，默认inst
             channels = subscription.get("channels", [])
             data_types = subscription.get("data_types", ["T"])
             
@@ -125,17 +125,18 @@ class DataScheduler:
                 # 获取各种类型的数据
                 for data_type_str in data_types:
                     try:
-                        data_type = DataType(data_type_str)
-                        data = await self.edge_data_client.get_comsrv_data(channel_id, data_type)
+                        # 直接使用字符串，不转换为枚举，支持任意数据类型
+                        data = await self.edge_data_client.get_data(channel_id, data_type_str, source)
                         
                         if data:
                             updates.append({
+                                "source": source,  # 添加source字段
                                 "channel_id": channel_id,
                                 "data_type": data_type_str,
                                 "values": data
                             })
-                    except ValueError:
-                        logger.warning(f"无效的数据类型: {data_type_str}")
+                    except Exception as e:
+                        logger.warning(f"获取数据类型 {data_type_str} 失败: {e}")
                         continue
                 
                 if updates:
@@ -152,7 +153,7 @@ class DataScheduler:
                     # 向客户端推送数据
                     await self.websocket_manager.send_message(client_id, batch_message)
                     
-                    logger.debug(f"已向客户端 {client_id} 推送通道 {channel_id} 的数据，更新数量: {len(updates)}")
+                    logger.debug(f"已向客户端 {client_id} 推送数据源 {source} 通道 {channel_id} 的数据，更新数量: {len(updates)}")
                     
         except Exception as e:
             logger.error(f"向客户端 {client_id} 推送数据失败: {e}")
@@ -174,17 +175,18 @@ class DataScheduler:
         except Exception as e:
             logger.error(f"获取并广播Edge数据失败: {e}")
     
-    async def _process_channel_data(self, channel_id: int):
+    async def _process_channel_data(self, channel_id: int, source: str = "inst"):
         """处理单个通道的数据"""
         try:
             updates = []
             
             # 获取各种类型的数据
             for data_type in DataType:
-                data = await self.edge_data_client.get_comsrv_data(channel_id, data_type)
+                data = await self.edge_data_client.get_data(channel_id, data_type, source)
                 
                 if data:
                     updates.append({
+                        "source": source,  # 添加source字段
                         "channel_id": channel_id,
                         "data_type": data_type.value,
                         "values": data
@@ -202,17 +204,17 @@ class DataScheduler:
                 }
                 
                 # 只向订阅了该通道的客户端推送数据
-                await self._push_to_subscribed_clients(channel_id, batch_message)
+                await self._push_to_subscribed_clients(channel_id, source, batch_message)
                 
-                logger.debug(f"已处理通道 {channel_id} 的数据，更新数量: {len(updates)}")
+                logger.debug(f"已处理数据源 {source} 通道 {channel_id} 的数据，更新数量: {len(updates)}")
             else:
-                logger.debug(f"通道 {channel_id} 没有新数据")
+                logger.debug(f"数据源 {source} 通道 {channel_id} 没有新数据")
                 
         except Exception as e:
-            logger.error(f"处理通道 {channel_id} 数据失败: {e}")
+            logger.error(f"处理数据源 {source} 通道 {channel_id} 数据失败: {e}")
     
-    async def _push_to_subscribed_clients(self, channel_id: int, message: dict):
-        """向订阅了特定通道的客户端推送数据"""
+    async def _push_to_subscribed_clients(self, channel_id: int, source: str, message: dict):
+        """向订阅了特定通道和数据源的客户端推送数据"""
         try:
             if not self.websocket_manager:
                 return
@@ -224,8 +226,9 @@ class DataScheduler:
             pushed_count = 0
             
             for client_id, subscription in subscriptions.items():
-                # 检查客户端是否订阅了该通道
-                if channel_id in subscription.get("channels", []):
+                # 检查客户端是否订阅了该数据源和通道
+                client_source = subscription.get("source", "inst")
+                if client_source == source and channel_id in subscription.get("channels", []):
                     try:
                         # 向订阅的客户端推送数据
                         await self.websocket_manager.send_message(client_id, message)
@@ -234,9 +237,9 @@ class DataScheduler:
                         logger.error(f"向客户端 {client_id} 推送数据失败: {e}")
             
             if pushed_count > 0:
-                logger.info(f"已向 {pushed_count} 个订阅客户端推送通道 {channel_id} 的数据")
+                logger.info(f"已向 {pushed_count} 个订阅客户端推送数据源 {source} 通道 {channel_id} 的数据")
             else:
-                logger.debug(f"通道 {channel_id} 没有订阅的客户端")
+                logger.debug(f"数据源 {source} 通道 {channel_id} 没有订阅的客户端")
                 
         except Exception as e:
             logger.error(f"推送数据到订阅客户端失败: {e}")

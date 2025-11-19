@@ -14,7 +14,7 @@ import time
 from app.core.redis_client import RedisClient
 from app.core.edge_data_client import EdgeDataClient
 from app.models.edge_data import (
-    WebSocketMessageType, DataType, create_data_update_message, 
+    WebSocketMessageType, create_data_update_message, 
     create_alarm_message, create_subscribe_ack_message, create_unsubscribe_ack_message,
     create_control_ack_message, create_error_message, create_pong_message
 )
@@ -51,6 +51,7 @@ class ConnectionManager:
             "last_activity": datetime.now()
         }
         self.subscriptions[client_id] = {
+            "source": "inst",  # 默认数据源
             "channels": [],
             "data_types": [],
             "interval": 1000
@@ -257,12 +258,17 @@ class WebSocketManager:
     async def _handle_subscribe(self, client_id: str, data: Dict[str, Any]):
         """处理订阅请求"""
         try:
+            source = data.get("data", {}).get("source", "inst")  # 获取数据源，默认inst
             channels = data.get("data", {}).get("channels", [])
             data_types = data.get("data", {}).get("data_types", ["T"])
             interval = data.get("data", {}).get("interval", 1000)
             
+            # 前端完全控制订阅的source/channels/data_types，不做额外验证
+            # 数据源可以是任意字符串（如 inst/comsrv/aaasrv 等）
+            
             # 更新订阅信息
             self.connection_manager.subscriptions[client_id] = {
+                "source": source,
                 "channels": channels,
                 "data_types": data_types,
                 "interval": interval
@@ -277,13 +283,13 @@ class WebSocketManager:
             await self.send_message(client_id, ack_message)
             
             # 立即推送一次数据
-            await self._push_initial_data_to_client(client_id, channels, data_types)
+            await self._push_initial_data_to_client(client_id, source, channels, data_types)
             
             # 重置数据调度器的推送时间，避免立即再次推送
             if hasattr(self, 'data_scheduler') and self.data_scheduler:
                 self.data_scheduler.reset_client_push_time(client_id)
             
-            logger.info(f"客户端 {client_id} 订阅了通道 {channels}, 数据类型 {data_types}")
+            logger.info(f"客户端 {client_id} 订阅了数据源 {source}, 通道 {channels}, 数据类型 {data_types}")
             
         except Exception as e:
             logger.error(f"处理订阅请求失败: {e}")
@@ -295,7 +301,7 @@ class WebSocketManager:
             )
             await self.send_message(client_id, error_msg)
     
-    async def _push_initial_data_to_client(self, client_id: str, channels: List[int], data_types: List[str]):
+    async def _push_initial_data_to_client(self, client_id: str, source: str, channels: List[int], data_types: List[str]):
         """订阅成功后立即推送一次数据"""
         try:
             # 为每个通道获取数据
@@ -305,17 +311,18 @@ class WebSocketManager:
                 # 获取各种类型的数据
                 for data_type_str in data_types:
                     try:
-                        data_type = DataType(data_type_str)
-                        data = await self.edge_data_client.get_comsrv_data(channel_id, data_type)
+                        # 直接使用字符串，不转换为枚举，支持任意数据类型
+                        data = await self.edge_data_client.get_data(channel_id, data_type_str, source)
                         
                         if data:
                             updates.append({
+                                "source": source,  # 添加source字段
                                 "channel_id": channel_id,
                                 "data_type": data_type_str,
                                 "values": data
                             })
-                    except ValueError:
-                        logger.warning(f"无效的数据类型: {data_type_str}")
+                    except Exception as e:
+                        logger.warning(f"获取数据类型 {data_type_str} 失败: {e}")
                         continue
                 
                 if updates:
@@ -331,7 +338,7 @@ class WebSocketManager:
                     
                     # 向客户端推送初始数据
                     await self.send_message(client_id, initial_message)
-                    logger.info(f"已向客户端 {client_id} 推送通道 {channel_id} 的初始数据，更新数量: {len(updates)}")
+                    logger.info(f"已向客户端 {client_id} 推送数据源 {source} 通道 {channel_id} 的初始数据，更新数量: {len(updates)}")
                     
         except Exception as e:
             logger.error(f"向客户端 {client_id} 推送初始数据失败: {e}")
@@ -376,6 +383,7 @@ class WebSocketManager:
         """处理控制命令"""
         try:
             control_data = data.get("data", {})
+            source = control_data.get("source", "inst")  # 获取数据源，默认inst
             channel_id = control_data.get("channel_id")
             point_id = control_data.get("point_id")
             command_type = control_data.get("command_type")
@@ -395,8 +403,9 @@ class WebSocketManager:
             
             success = await self.edge_data_client.publish_command(
                 channel_id, 
-                DataType.C, 
-                command_data
+                "C",  # 控制命令类型
+                command_data,
+                source  # 传递数据源
             )
             
             if success:
