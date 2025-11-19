@@ -16,6 +16,20 @@ from app.models.edge_data import (
 
 logger = logging.getLogger(__name__)
 
+
+def round_float_value(value: float, decimal_places: int = 4) -> float:
+    """限制浮点数的小数位数
+    
+    Args:
+        value: 要处理的浮点数
+        decimal_places: 保留的小数位数，默认4位
+        
+    Returns:
+        限制小数位数后的浮点数
+    """
+    return round(value, decimal_places)
+
+
 class EdgeDataClient:
     """Edge数据客户端"""
     
@@ -90,7 +104,7 @@ class EdgeDataClient:
                     
                     # 尝试转换为数值
                     if '.' in str_value:
-                        result[str_point_id] = float(str_value)
+                        result[str_point_id] = round_float_value(float(str_value))
                     else:
                         try:
                             result[str_point_id] = int(str_value)
@@ -158,7 +172,7 @@ class EdgeDataClient:
                 else:
                     try:
                         if '.' in value:
-                            values[key] = float(value)
+                            values[key] = round_float_value(float(value))
                         else:
                             values[key] = int(value)
                     except ValueError:
@@ -200,7 +214,7 @@ class EdgeDataClient:
                 else:
                     try:
                         if '.' in value:
-                            values[key] = float(value)
+                            values[key] = round_float_value(float(value))
                         else:
                             values[key] = int(value)
                     except ValueError:
